@@ -11,27 +11,51 @@ contract FOMOdrop is ERC721A, Ownable {
 
   using Strings for uint256;
 
-  uint256 public cost = 25000000000000000000;
+  uint256 public cost = 12340000000000000000;
+  uint256 public topbid;
+  uint256 public bidendblock;
   string public baseURI;
   string public baseExtension = ".json";
   bool public closed = false;
   address public ashContract = 0x64D91f12Ece7362F91A6f8E7940Cd55F05060b92;
+  address payable public topbidder;
+  mapping (address => bool) public minters;
 
 
   constructor() ERC721A("FOMOdrop", "FD") {
     _safeMint(address(this), 1);
+    topbidder = payable(msg.sender);
+    topbid = 0;
   }
 
 
   // external 
 
-  function mint(uint256 quantity) external {
+  function mint() external {
     require(!closed);
-    require(quantity > 0);
-    require(IERC20(ashContract).balanceOf(msg.sender) >= cost * quantity);
-    require(IERC20(ashContract).balanceOf(msg.sender) >= 50000000000000000000);
-    IERC20(ashContract).transferFrom(msg.sender, address(this), cost * quantity);
-    _safeMint(msg.sender, quantity);
+    require(!checkMinted(msg.sender));
+    minters[msg.sender]=true;
+    require(IERC20(ashContract).balanceOf(msg.sender) >= 25000000000000000000);
+    IERC20(ashContract).transferFrom(msg.sender, address(this), cost);
+    _mint(msg.sender, 1);
+  }
+
+  function bid() payable external {
+      uint256 curblock = block.number;
+
+      require (curblock <= bidendblock);
+      require (msg.value > topbid);
+      topbidder.transfer(topbid);
+
+
+      //assign values to new top bider
+      topbidder = payable(msg.sender);
+      topbid = msg.value;
+
+      //bids made in last 100 blocks extend the auction 50 blocks. (Approx +10 minutes)
+      if (curblock + 100 >= bidendblock) {
+          bidendblock = bidendblock + 50;
+        }
   }
 
 
@@ -43,6 +67,10 @@ contract FOMOdrop is ERC721A, Ownable {
 
 
     // View 
+
+    function checkMinted(address _wallet) public view returns (bool) {
+        return minters[_wallet];
+    }
 
     function walletOfOwner(address _owner)
         public
@@ -90,6 +118,10 @@ contract FOMOdrop is ERC721A, Ownable {
 
   //only owner
 
+  function beginauction() external onlyOwner {
+      bidendblock = block.number + 6750;
+  }
+
   function setBaseURI(string memory _newBaseURI) public onlyOwner {
     baseURI = _newBaseURI;
   }
@@ -98,17 +130,19 @@ contract FOMOdrop is ERC721A, Ownable {
     baseExtension = _newBaseExtension;
   }
 
-  function Biddermints(uint256 quantity) external onlyOwner {
+  function biddermints(uint256 quantity) external onlyOwner {
     require(quantity > 0);
-    _safeMint(msg.sender, quantity);
+    _mint(msg.sender, quantity);
   }
 
   function stop(bool _state) external onlyOwner {
     closed = _state;
   }
  
-  function withdraw(uint256 amount) external payable onlyOwner {
+  function withdraw(uint256 ashamount) external onlyOwner {
     require(payable(msg.sender).send(address(this).balance));
-    IERC20(ashContract).transfer(msg.sender, amount);
+    if(ashamount>0){
+    IERC20(ashContract).transfer(msg.sender, ashamount);
+    }
   }
 }
