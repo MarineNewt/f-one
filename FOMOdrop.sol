@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0
-
 pragma solidity ^0.8.8;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -17,6 +16,7 @@ contract FOMOdrop is ERC721A, Ownable {
   string public baseURI;
   string public baseExtension = ".json";
   bool public closed = false;
+  bool private claimed = false;
   address public ashContract = 0x64D91f12Ece7362F91A6f8E7940Cd55F05060b92;
   address payable public topbidder;
   mapping (address => bool) public minters;
@@ -42,7 +42,7 @@ contract FOMOdrop is ERC721A, Ownable {
 
   function bid() payable external {
       uint256 curblock = block.number;
-
+      require (tx.origin == msg.sender);
       require (curblock <= bidendblock);
       require (msg.value > topbid);
       topbidder.transfer(topbid);
@@ -57,7 +57,14 @@ contract FOMOdrop is ERC721A, Ownable {
           bidendblock = bidendblock + 50;
         }
   }
-
+  
+  function winnerclaim() external {
+    require (!claimed);
+    require (msg.sender == topbidder);
+    require (block.number > bidendblock);
+    transferFrom(address(this), msg.sender, 0);
+    claimed = true;
+  }
 
   // internal
 
@@ -66,7 +73,7 @@ contract FOMOdrop is ERC721A, Ownable {
   }
 
 
-    // View 
+  // View 
 
     function checkMinted(address _wallet) public view returns (bool) {
         return minters[_wallet];
